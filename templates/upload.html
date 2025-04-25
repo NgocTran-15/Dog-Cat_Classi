@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân loại Chó/Mèo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 2rem;
+        }
+        .upload-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .btn-custom {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+        }
+        .btn-custom:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="upload-container text-center">
+            <h1 class="mb-4">🐶 Phân loại Chó/Mèo 🐱</h1>
+            <p class="mb-4">Tải lên ảnh chó hoặc mèo để AI phân loại!</p>
+            
+            <form action="/" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input class="form-control" type="file" name="file" accept="image/*" required>
+                </div>
+                <button type="submit" class="btn btn-custom btn-lg">Phân tích</button>
+            </form>
+            
+            <div class="mt-4">
+                <p class="text-muted">Hỗ trợ định dạng: JPG, PNG, JPEG</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
