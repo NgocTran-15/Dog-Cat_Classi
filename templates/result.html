@@ -47,6 +47,11 @@
             border-color: #ffeeba;
             color: #856404;
         }
+        .fun-message {
+            margin-top: 1rem;
+            font-style: italic;
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -60,11 +65,16 @@
             
             <div class="alert {% if prediction == 'Chó' %}alert-dog{% elif prediction == 'Mèo' %}alert-cat{% else %}alert-unknown{% endif %}">
                 <h4 class="alert-heading">Kết quả: {{ prediction }}</h4>
-                {% if prediction != 'Không phải chó/mèo' %}
+                {% if prediction == 'Chó' %}
                     <p>Độ chính xác: {{ confidence }}%</p>
+                    <p class="fun-message">🐕 Woof! Woof! Một em cún đáng yêu!</p>
+                {% elif prediction == 'Mèo' %}
+                    <p>Độ chính xác: {{ confidence }}%</p>
+                    <p class="fun-message">😺 Meow! Meow! Một bé mèo xinh xắn!</p>
                 {% else %}
                     <p>Hệ thống không chắc chắn đây là ảnh chó hoặc mèo.</p>
                     <p>Độ tin cậy: {{ confidence }}%</p>
+                    <p class="fun-message">🤔 Hmmm... Hãy thử lại với ảnh khác nhé!</p>
                 {% endif %}
             </div>
             
