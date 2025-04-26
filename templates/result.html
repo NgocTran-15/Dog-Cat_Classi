@@ -51,6 +51,25 @@
             margin-top: 1rem;
             font-style: italic;
             color: #6c757d;
+            font-size: 1.2rem;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .alert-dog .fun-message {
+            color: #155724;
+        }
+        
+        .alert-cat .fun-message {
+            color: #004085;
+        }
+        
+        .alert-unknown .fun-message {
+            color: #856404;
         }
     </style>
 </head>
@@ -67,10 +86,22 @@
                 <h4 class="alert-heading">Kết quả: {{ prediction }}</h4>
                 {% if prediction == 'Chó' %}
                     <p>Độ chính xác: {{ confidence }}%</p>
-                    <p class="fun-message">🐕 Woof! Woof! Một em cún đáng yêu!</p>
+                    {% if confidence >= 80 %}
+                        <p class="fun-message">🐕 Woof! Woof! Một em cún đáng yêu!</p>
+                    {% elif confidence >= 70 %}
+                        <p class="fun-message">Ồ, là một em cún!</p>
+                    {% else %}
+                        <p class="fun-message">Có vẻ là một chú chó!</p>
+                    {% endif %}
                 {% elif prediction == 'Mèo' %}
                     <p>Độ chính xác: {{ confidence }}%</p>
-                    <p class="fun-message">😺 Meow! Meow! Một bé mèo xinh xắn!</p>
+                    {% if confidence >= 80 %}
+                        <p class="fun-message">😺 Meow! Meow! Một bé mèo xinh xắn!</p>
+                    {% elif confidence >= 70 %}
+                        <p class="fun-message">Ồ, là một em mèo!</p>
+                    {% else %}
+                        <p class="fun-message">Có vẻ là một chú mèo!</p>
+                    {% endif %}
                 {% else %}
                     <p>Hệ thống không chắc chắn đây là ảnh chó hoặc mèo.</p>
                     <p>Độ tin cậy: {{ confidence }}%</p>

@@ -12,12 +12,11 @@ app = Flask(__name__)
 
 # Define image size
 IMG_SIZE = (128, 128)
-# Confidence threshold for classification
-CONFIDENCE_THRESHOLD = 0.85
-# Number of Monte Carlo samples - reduced for better performance
-MC_SAMPLES = 40  # Reduced from 50
-# Variance threshold for OOD detection
-VARIANCE_THRESHOLD = 0.1
+# Điều chỉnh các threshold để cân bằng giữa OOD và classification
+CONFIDENCE_THRESHOLD = 0.65  # Giảm để dễ phân loại hơn
+VARIANCE_THRESHOLD = 0.15    # Tăng để phát hiện OOD tốt hơn
+ENTROPY_THRESHOLD = 0.65     # Cân bằng giữa nhạy và đặc hiệu
+MC_SAMPLES = 50             # Giữ nguyên số lượng samples
 
 # Enable GPU memory growth to prevent memory issues
 physical_devices = tf.config.list_physical_devices('GPU')
@@ -61,27 +60,47 @@ def load_model_safely():
 model = load_model_safely()
 
 def monte_carlo_predictions(model, img_array):
-    predictions = np.zeros(MC_SAMPLES)
+    predictions = np.zeros((MC_SAMPLES, 1))
+    features = np.zeros((MC_SAMPLES, 512))  # Lấy feature từ layer cuối cùng
     
-    # Perform multiple forward passes with dropout
     for i in range(MC_SAMPLES):
         pred = model.predict(img_array, verbose=0)
         predictions[i] = pred[0][0]
+        
+        # Lấy features từ layer Dense cuối để phát hiện OOD
+        feature_model = tf.keras.Model(model.input, model.layers[-2].output)
+        features[i] = feature_model.predict(img_array, verbose=0)
     
-    # Calculate mean and variance using numpy operations
     mean_pred = np.mean(predictions)
     var_pred = np.var(predictions)
     
-    # Calculate entropy-based uncertainty
-    uncertainty = -mean_pred * np.log2(mean_pred + 1e-10) - (1 - mean_pred) * np.log2(1 - mean_pred + 1e-10)
+    # Tính toán các metrics mới cho OOD
+    feature_variance = np.mean(np.var(features, axis=0))
+    prediction_range = np.max(predictions) - np.min(predictions)
+    entropy = -mean_pred * np.log2(mean_pred + 1e-10) - (1 - mean_pred) * np.log2(1 - mean_pred + 1e-10)
     
-    return mean_pred, var_pred, uncertainty
+    
+    confidence_score = (1 - var_pred) * (1 - feature_variance) * (1 - entropy)
+    
+    # Điều kiện phân loại được tinh chỉnh
+    is_dog = mean_pred > 0.65 and confidence_score > CONFIDENCE_THRESHOLD
+    is_cat = mean_pred < 0.35 and confidence_score > CONFIDENCE_THRESHOLD
+    
+    # OOD detection với nhiều tiêu chí
+    is_ood = (
+        (0.35 <= mean_pred <= 0.65) or            # Vùng không chắc chắn
+        (feature_variance > VARIANCE_THRESHOLD) or # Feature variance cao
+        (prediction_range > 0.4) or               # Range dự đoán lớn
+        (confidence_score < CONFIDENCE_THRESHOLD)  # Confidence thấp
+    )
+    
+    return mean_pred, confidence_score, is_dog, is_cat, is_ood
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if model is None:
         return render_template('error.html', 
-            message="Lỗi: Không thể tải model. Vui lòng kiểm tra file model và phiên bản TensorFlow/Keras.")
+            message="Cannot load model. Please check the model file and TensorFlow/Keras version.")
         
     if request.method == 'POST':
         try:
@@ -100,48 +119,40 @@ def upload_file():
             img_array = np.expand_dims(img_array, axis=0)
             
             try:
-                # Make Monte Carlo predictions
-                mean_pred, var_pred, uncertainty = monte_carlo_predictions(model, img_array)
+                mean_pred, confidence_score, is_dog, is_cat, is_ood = monte_carlo_predictions(model, img_array)
                 
-                # Enhanced OOD detection using both variance and uncertainty
-                is_ood = (var_pred > VARIANCE_THRESHOLD) or (uncertainty > 0.8) or \
-                        (mean_pred > 0.4 and mean_pred < 0.6)
-                
-                # Determine result based on OOD detection and mean prediction
                 if is_ood:
                     label = 'Không phải chó/mèo'
-                    # Calculate confidence based on how far from decision boundary
-                    confidence = 1.0 - (2 * abs(mean_pred - 0.5))
+                    confidence = confidence_score * 100
+                elif is_dog:
+                    label = 'Chó'
+                    confidence = mean_pred * confidence_score * 100
+                elif is_cat:
+                    label = 'Mèo'
+                    confidence = (1 - mean_pred) * confidence_score * 100
                 else:
-                    if mean_pred >= 0.6:
-                        label = 'Chó'
-                        confidence = mean_pred
-                    elif mean_pred <= 0.4:
-                        label = 'Mèo'
-                        confidence = 1 - mean_pred
-                    else:
-                        label = 'Không phải chó/mèo'
-                        confidence = 1.0 - (2 * abs(mean_pred - 0.5))
+                    label = 'Không phải chó/mèo'
+                    confidence = confidence_score * 100
                 
-                confidence_percent = round(max(min(confidence * 100, 100), 0), 2)
+                confidence_percent = round(max(min(confidence, 100), 0), 2)
                 
             except Exception as e:
                 print(f"Monte Carlo prediction failed: {str(e)}")
-                # Fallback to single prediction if Monte Carlo fails
+                # Fallback với single prediction được cải thiện
                 prediction = model.predict(img_array, verbose=0)[0][0]
                 
-                # Enhanced single prediction OOD detection
-                if 0.4 <= prediction <= 0.6:
+                # Thêm kiểm tra OOD cho single prediction
+                if 0.35 <= prediction <= 0.65:
                     label = 'Không phải chó/mèo'
-                    confidence = 1.0 - (2 * abs(prediction - 0.5))
-                elif prediction > 0.6:
+                    confidence = (1 - 2 * abs(prediction - 0.5)) * 100
+                elif prediction > 0.65:
                     label = 'Chó'
-                    confidence = prediction
+                    confidence = prediction * 100
                 else:
                     label = 'Mèo'
-                    confidence = 1 - prediction
+                    confidence = (1 - prediction) * 100
                 
-                confidence_percent = round(max(min(confidence * 100, 100), 0), 2)
+                confidence_percent = round(max(min(confidence, 100), 0), 2)
             
             return render_template('result.html', 
                                 prediction=label, 
